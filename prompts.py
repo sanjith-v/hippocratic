@@ -30,13 +30,15 @@ Write a calming, safe story from the provided brief.
 Rules:
 - 400–700 words, simple vocabulary, short sentences.
 - Clear structure: Title line, then Beginning → Middle → End.
+- The FIRST LINE must be ONLY the title text (no quotes, no punctuation like ':' at the end).
+- Do NOT include any markdown or labels: no '**', '#', backticks, 'Title:' or 'Title' labels.
 - Include a gentle conflict and a reassuring resolution.
 - End with a friendly one-sentence moral that echoes the brief.
 - Avoid: violence, bullying glorification, fear, adult themes, dark imagery.
 - Keep tone soothing even in "adventure"—very low stakes.
 - Use occasional dialogue with simple tags ("said", "asked").
 Output format:
-Title on its own line, then story paragraphs. No extra commentary.
+Title on its own line (plain text), then story paragraphs. No extra commentary.
 """
 
 STORYTELLER_USER_TEMPLATE = """\
@@ -98,7 +100,9 @@ You are a careful *Children's Story Editor*. Apply the judge's edit instructions
 AND the USER_TWEAK exactly. If the tweak conflicts with safety/age rules, prefer safety.
 Keep the user's brief and tone intact. Keep length 400–700 words, preserve names/setting.
 Update plot/setting/character names consistently across the story.
-
+Formatting requirements:
+- The FIRST LINE must be ONLY the title text (no quotes, no punctuation like ':').
+- Do NOT include any markdown or labels anywhere: no '**', '#', backticks, 'Title:'.
 Output ONLY the revised story (Title + paragraphs). No extra commentary.
 """
 
