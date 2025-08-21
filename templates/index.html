@@ -5,25 +5,25 @@
     <title>Bedtime Story Generator</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; background: #fbfbfd; color: #0f172a; }
       .container { max-width: 980px; margin: 0 auto; }
-      .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+      .card { border: 1px solid #e5e7eb; background: #fff; border-radius: 14px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(15,23,42,0.03); }
       .title { font-size: 1.4rem; font-weight: 700; margin: 0 0 8px; }
-      .btn { padding: 10px 16px; border-radius: 8px; border: 1px solid #1f2937; background: #111827; color: #fff; cursor: pointer; }
+      .btn { padding: 10px 16px; border-radius: 10px; border: 1px solid #1f2937; background: #111827; color: #fff; cursor: pointer; }
       .btn.secondary { background: #fff; color: #111827; }
       .btn[disabled] { opacity: 0.6; cursor: not-allowed; }
       .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-      .muted { color: #6b7280; font-size: 0.9rem; }
-      textarea, input[type="text"] { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; }
-      .alert { padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+      .muted { color: #64748b; font-size: 0.95rem; }
+      textarea, input[type="text"] { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 10px; background: #fff; }
+      .alert { padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; }
       .alert.info { background: #eef2ff; color: #1e3a8a; }
       .alert.warning { background: #fef3c7; color: #92400e; }
       .alert.danger { background: #fee2e2; color: #991b1b; }
-      .chapter { padding: 12px; border: 1px dashed #e5e7eb; border-radius: 8px; margin-bottom: 12px; background: #fafafa; }
+      .chapter { padding: 14px; border: 1px dashed #e5e7eb; border-radius: 10px; margin-bottom: 12px; background: #fafafa; }
 
       /* Loading overlay + spinner */
       .overlay {
-        position: fixed; inset: 0; background: rgba(255,255,255,0.8);
+        position: fixed; inset: 0; background: rgba(255,255,255,0.85);
         display: none; align-items: center; justify-content: center; z-index: 9999;
       }
       .overlay.show { display: flex; }
@@ -46,7 +46,7 @@
 
     <div class="container">
       <h1 class="title">🌙 Bedtime Story Generator (Ages 5–10)</h1>
-      <p class="muted">Choose a short story or build a multi-chapter bedtime tale.</p>
+      <p class="muted">Pick a short story or build a gentle multi-chapter bedtime tale.</p>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -73,7 +73,7 @@
 
         {% if state %}
           <form id="resetForm" action="{{ url_for('reset') }}" method="post" style="margin-top:10px;">
-            <button class="btn secondary" type="submit">Reset</button>
+            <button class="btn secondary" type="submit">End (Start New Story)</button>
           </form>
         {% endif %}
       </div>
@@ -115,34 +115,41 @@
           {% endfor %}
         </div>
 
-        <div class="card">
-          <div class="title">Chapter Controls</div>
-          <div class="row">
-            <form id="arcNextForm" action="{{ url_for('arc_next') }}" method="post">
-              <button id="arcNextBtn" class="btn" type="submit">Next Chapter</button>
+        {% if not state.arc_ready_to_end %}
+          <div class="card">
+            <div class="title">Chapter Controls</div>
+            <div class="row">
+              <form id="arcNextForm" action="{{ url_for('arc_next') }}" method="post">
+                <button id="arcNextBtn" class="btn" type="submit">Next Chapter</button>
+              </form>
+              <form id="arcEndNextForm" action="{{ url_for('arc_end_next') }}" method="post">
+                <button id="arcEndNextBtn" class="btn" type="submit">End Story in Next Chapter</button>
+              </form>
+            </div>
+            <p class="muted" style="margin-top:10px;">
+              “End Story in Next Chapter” will produce the final chapter now. After that, you’ll only see “End Now”.
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="title">Tweak Latest Chapter</div>
+            <form id="tweakForm" action="{{ url_for('tweak') }}" method="post">
+              <input type="text" id="tweakInput" name="tweak" placeholder="e.g., add more dialogue between the friends" />
+              <div class="muted" style="margin: 6px 0 12px;">
+                This tweak revises the most recent chapter only. Try any free text.
+              </div>
+              <button id="tweakBtn" class="btn" type="submit">Apply Tweak</button>
             </form>
-            <form id="arcEndNextForm" action="{{ url_for('arc_end_next') }}" method="post">
-              <button id="arcEndNextBtn" class="btn" type="submit">End Story in Next Chapter</button>
-            </form>
+          </div>
+        {% else %}
+          <div class="card">
+            <div class="title">Final Chapter Created ✨</div>
+            <p class="muted">Click “End Now” to finish and return to the start.</p>
             <form id="arcEndNowForm" action="{{ url_for('arc_end_now') }}" method="post">
               <button id="arcEndNowBtn" class="btn" type="submit">End Now</button>
             </form>
           </div>
-          <p class="muted" style="margin-top:10px;">
-            “End Story in Next Chapter” creates a penultimate chapter that sets up a calm finale on the next click.
-          </p>
-        </div>
-
-        <div class="card">
-          <div class="title">Tweak Latest Chapter</div>
-          <form id="tweakForm" action="{{ url_for('tweak') }}" method="post">
-            <input type="text" id="tweakInput" name="tweak" placeholder="e.g., add more dialogue between the friends" />
-            <div class="muted" style="margin: 6px 0 12px;">
-              This tweak revises the most recent chapter only. Try: “shorter”, “calmer”, “more-dialogue”, “new-moral”, or any free text.
-            </div>
-            <button id="tweakBtn" class="btn" type="submit">Apply Tweak</button>
-          </form>
-        </div>
+        {% endif %}
 
         <div class="card">
           <div class="title">Quality Check (Judge)</div>
@@ -164,11 +171,7 @@
         const text = overlay.querySelector('.loading-text');
         text.textContent = msg || 'Working…';
         overlay.classList.add('show');
-        if (btn) {
-          btn.setAttribute('data-original-text', btn.textContent);
-          btn.textContent = 'Working…';
-          btn.disabled = true;
-        }
+        if (btn) { btn.setAttribute('data-original-text', btn.textContent); btn.textContent = 'Working…'; btn.disabled = true; }
       }
       function safeSubmit(form, msg, btn) {
         if (form.__submitting) return;
@@ -189,38 +192,30 @@
         });
       }
 
-      // Short-mode tweak or arc tweak (both use same id)
+      // Short-mode or Arc tweak (same ID)
       const tweakForm = document.getElementById('tweakForm');
       const tweakBtn  = document.getElementById('tweakBtn');
       if (tweakForm && tweakBtn) {
-        tweakForm.addEventListener('submit', e => {
-          e.preventDefault();
-          safeSubmit(tweakForm, 'Applying your tweak…', tweakBtn);
-        });
+        tweakForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(tweakForm, 'Applying your tweak…', tweakBtn); });
       }
 
-      // Arc controls
+      // Arc controls (until final chapter created)
       const nextForm = document.getElementById('arcNextForm');
       const nextBtn  = document.getElementById('arcNextBtn');
-      if (nextForm && nextBtn) {
-        nextForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(nextForm, 'Writing next chapter…', nextBtn); });
-      }
+      if (nextForm && nextBtn) { nextForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(nextForm, 'Writing next chapter…', nextBtn); }); }
+
       const endNextForm = document.getElementById('arcEndNextForm');
       const endNextBtn  = document.getElementById('arcEndNextBtn');
-      if (endNextForm && endNextBtn) {
-        endNextForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(endNextForm, 'Setting up finale…', endNextBtn); });
-      }
+      if (endNextForm && endNextBtn) { endNextForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(endNextForm, 'Writing final chapter…', endNextBtn); }); }
+
+      // Final End Now (resets immediately)
       const endNowForm = document.getElementById('arcEndNowForm');
       const endNowBtn  = document.getElementById('arcEndNowBtn');
-      if (endNowForm && endNowBtn) {
-        endNowForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(endNowForm, 'Wrapping up story…', endNowBtn); });
-      }
+      if (endNowForm && endNowBtn) { endNowForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(endNowForm, 'Ending…', endNowBtn); }); }
 
-      // Reset
+      // Top reset (always available after generation)
       const resetForm = document.getElementById('resetForm');
-      if (resetForm) {
-        resetForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(resetForm, 'Resetting…', null); });
-      }
+      if (resetForm) { resetForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(resetForm, 'Ending…', null); }); }
     </script>
   </body>
 </html>

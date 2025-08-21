@@ -11,7 +11,7 @@ from prompts import (
     CHAPTER_STORYTELLER_SYSTEM, CHAPTER_USER_TEMPLATE
 )
 
-# --- Sanitizer: guarantees no markdown/labels like **Title**, Title:, # etc. ---
+# -------------------- Utilities --------------------
 
 
 def _sanitize_story_text(text: str) -> str:
@@ -57,8 +57,8 @@ def _parse_json(s: str) -> Dict[str, Any]:
         s = s[start:end+1]
     return json.loads(s)
 
-# -------------------- Core (classifier / storyteller / judge / editor) --------------------
 
+# -------------------- Core (classifier / storyteller / judge / editor) --------------------
 
 def classify_request(user_request: str) -> Dict[str, Any]:
     messages = [
@@ -122,11 +122,14 @@ def edit_story(brief: Dict[str, Any], story: str, judge_json: Dict[str, Any], us
 
 
 def generate_story(user_request: str, max_rounds: int = 2) -> Dict[str, Any]:
+    """
+    Short-story flow: Classify -> Storyteller -> Judge (+Editor if needed) -> Judge
+    """
     brief = classify_request(user_request)
     story = tell_story(brief)
-    history = []
+    history: List[Dict[str, Any]] = []
 
-    for round_idx in range(1, max_rounds+1):
+    for round_idx in range(1, max_rounds + 1):
         verdict = judge_story(brief, story)
         history.append({"round": round_idx, "verdict": verdict})
         if verdict.get("pass"):
@@ -134,7 +137,7 @@ def generate_story(user_request: str, max_rounds: int = 2) -> Dict[str, Any]:
         story = edit_story(brief, story, verdict)
 
     final_verdict = judge_story(brief, story)
-    history.append({"round": max_rounds+1, "verdict": final_verdict})
+    history.append({"round": max_rounds + 1, "verdict": final_verdict})
     return {"brief": brief, "story": story, "history": history, "passed": final_verdict.get("pass", False)}
 
 
@@ -144,6 +147,9 @@ def apply_tweak(
     tweak_text: str,
     rounds: int = 2
 ) -> Tuple[str, Dict[str, Any]]:
+    """
+    Apply user-supplied tweak to a story or chapter via Editor -> Judge loop.
+    """
     verdict = judge_story(brief, current_story, user_tweak=tweak_text)
     existing = verdict.get("edit_instructions", "")
     verdict["edit_instructions"] = (
@@ -158,8 +164,8 @@ def apply_tweak(
 
     return story, verdict
 
-# -------------------- Multi-arc / chapter helpers --------------------
 
+# -------------------- Multi-arc / chapter helpers --------------------
 
 def _concat_chapters(chapters: List[str]) -> str:
     """Join chapters with two newlines for readability."""
@@ -176,7 +182,6 @@ def generate_first_chapter(brief: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         {"role": "user", "content": CHAPTER_USER_TEMPLATE.format(
             brief_json=json.dumps(brief),
             story_so_far="",
-            end_in_next="false",
             end_now="false"
         )}
     ]
@@ -196,11 +201,11 @@ def generate_first_chapter(brief: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
 def generate_next_chapter(
     brief: Dict[str, Any],
     prior_chapters: List[str],
-    end_in_next: bool = False,
     end_now: bool = False
 ) -> Tuple[str, Dict[str, Any]]:
     """
-    Generate the next chapter considering STORY SO FAR and end flags.
+    Generate the next chapter considering STORY SO FAR and end flag.
+    If end_now=True, the chapter must conclude the whole story.
     Returns (chapter_text, verdict).
     """
     story_so_far = _concat_chapters(prior_chapters)
@@ -209,7 +214,6 @@ def generate_next_chapter(
         {"role": "user", "content": CHAPTER_USER_TEMPLATE.format(
             brief_json=json.dumps(brief),
             story_so_far=story_so_far,
-            end_in_next=str(end_in_next).lower(),
             end_now=str(end_now).lower()
         )}
     ]

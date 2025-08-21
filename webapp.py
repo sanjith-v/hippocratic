@@ -3,11 +3,9 @@ from pipeline import (
     generate_first_chapter, generate_next_chapter
 )
 import os
-import json
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 
-# Load .env locally; on Heroku use config vars
 load_dotenv()
 
 
@@ -23,7 +21,7 @@ def create_app():
     @app.route("/generate", methods=["POST"])
     def generate():
         prompt = request.form.get("prompt", "").strip()
-        mode = request.form.get("mode", "short")  # 'short' or 'arc'
+        mode = request.form.get("mode", "short")
         if not prompt:
             flash("Please enter a quick story idea.", "warning")
             return redirect(url_for("index"))
@@ -35,27 +33,22 @@ def create_app():
 
         try:
             if mode == "arc":
-                # Classify and produce Chapter 1
-                # Reuse generate_story's classifier path to build a brief quickly:
-                # We'll call generate_first_chapter with that brief instead of making a full short story.
-                # To avoid an extra call, we can just run generate_first_chapter and let it classify internally if you want,
-                # but we'll keep consistency by calling generate_story once, then discard its 'story' and reuse 'brief'.
-                # fast brief creation
+                # Build brief quickly via the short flow (to get a brief) then start Chapter 1
                 init = generate_story(prompt, max_rounds=1)
                 brief = init["brief"]
 
-                # Chapter 1
                 ch1, verdict1 = generate_first_chapter(brief)
                 session["state"] = {
                     "mode": "arc",
                     "prompt": prompt,
                     "brief": brief,
                     "chapters": [ch1],
-                    "arc_should_end_next": False,
+                    # final chapter already produced? (False initially)
+                    "arc_ready_to_end": False,
                     "history": [{"round": "chapter-1", "verdict": verdict1}],
                 }
             else:
-                # Short story mode (current flow)
+                # Short story mode
                 result = generate_story(prompt, max_rounds=2)
                 session["state"] = {
                     "mode": "short",
@@ -85,7 +78,12 @@ def create_app():
 
         try:
             if state.get("mode") == "arc":
-                # Apply tweak to the most recent chapter (revise last chapter)
+                # If the final chapter was already created, don't allow tweaks (user should End Now)
+                if state.get("arc_ready_to_end"):
+                    flash(
+                        "The final chapter is ready. Click 'End Now' to finish.", "info")
+                    return redirect(url_for("index"))
+
                 brief = state["brief"]
                 chapters = state["chapters"]
                 last = chapters[-1]
@@ -97,7 +95,6 @@ def create_app():
                     {"round": f"tweak-ch{len(chapters)}", "verdict": new_verdict})
                 session["state"] = state
             else:
-                # Short story tweak (existing)
                 brief = state["brief"]
                 story = state["story"]
                 new_story, new_verdict = apply_tweak(
@@ -118,19 +115,19 @@ def create_app():
         if not state or state.get("mode") != "arc":
             flash("Start a multi-arc story first.", "warning")
             return redirect(url_for("index"))
+        if state.get("arc_ready_to_end"):
+            flash(
+                "The final chapter is already created. Click 'End Now' to finish.", "info")
+            return redirect(url_for("index"))
 
         try:
             brief = state["brief"]
             chapters = state["chapters"]
-            end_in_next = False
-            end_now = False
-
             chapter, verdict = generate_next_chapter(
-                brief, chapters, end_in_next=end_in_next, end_now=end_now)
+                brief, chapters, end_now=False)
             chapters.append(chapter)
             state["history"].append(
                 {"round": f"chapter-{len(chapters)}", "verdict": verdict})
-            state["arc_should_end_next"] = False
             session["state"] = state
 
         except Exception as e:
@@ -140,48 +137,43 @@ def create_app():
 
     @app.route("/arc/end_next", methods=["POST"])
     def arc_end_next():
+        """
+        Generate the FINAL chapter now, then show only 'End Now' on the page.
+        """
         state = session.get("state")
         if not state or state.get("mode") != "arc":
             flash("Start a multi-arc story first.", "warning")
             return redirect(url_for("index"))
 
+        if state.get("arc_ready_to_end"):
+            # Already produced the final chapter; just show End Now on UI
+            return redirect(url_for("index"))
+
         try:
             brief = state["brief"]
             chapters = state["chapters"]
-            # This chapter sets up for the finale in the next one.
+            # Produce the final chapter immediately
             chapter, verdict = generate_next_chapter(
-                brief, chapters, end_in_next=True, end_now=False)
+                brief, chapters, end_now=True)
             chapters.append(chapter)
             state["history"].append(
-                {"round": f"chapter-{len(chapters)} (setup-finale)", "verdict": verdict})
-            state["arc_should_end_next"] = True
+                {"round": f"chapter-{len(chapters)} (final)", "verdict": verdict})
+            state["arc_ready_to_end"] = True  # UI will only show End Now
             session["state"] = state
+
         except Exception as e:
-            flash(f"Error creating penultimate chapter: {e}", "danger")
+            flash(f"Error creating final chapter: {e}", "danger")
 
         return redirect(url_for("index"))
 
     @app.route("/arc/end_now", methods=["POST"])
     def arc_end_now():
-        state = session.get("state")
-        if not state or state.get("mode") != "arc":
-            flash("Start a multi-arc story first.", "warning")
-            return redirect(url_for("index"))
-
-        try:
-            brief = state["brief"]
-            chapters = state["chapters"]
-            # Wrap everything up in THIS chapter
-            chapter, verdict = generate_next_chapter(
-                brief, chapters, end_in_next=False, end_now=True)
-            chapters.append(chapter)
-            state["history"].append(
-                {"round": f"chapter-{len(chapters)} (finale)", "verdict": verdict})
-            state["arc_should_end_next"] = False
-            session["state"] = state
-        except Exception as e:
-            flash(f"Error creating final chapter: {e}", "danger")
-
+        """
+        When End Now is clicked, immediately reset the session and return to start.
+        (We assume the final chapter has already been generated by /arc/end_next.)
+        """
+        session.pop("state", None)
+        flash("Story ended. Start a new one!", "info")
         return redirect(url_for("index"))
 
     @app.route("/reset", methods=["POST"])

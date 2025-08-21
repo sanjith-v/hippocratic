@@ -132,8 +132,7 @@ Rules:
 - Each chapter should advance the plot with a tiny, safe arc and end with a soft mini-beat (not a cliffhanger).
 - Avoid: violence, bullying glorification, fear, adult themes, dark imagery.
 - Keep names, setting, and tone consistent with STORY SO FAR.
-- If END_IN_NEXT is true, set up threads so the NEXT chapter can wrap the entire story.
-- If END_NOW is true, wrap up all threads by the end of THIS chapter with a calming, reassuring ending.
+- If END_NOW is true, wrap up the entire story by the end of THIS chapter with a calming, reassuring ending.
 Formatting:
 - The FIRST LINE must be ONLY the chapter title text (no quotes, no 'Title:' label, no markdown).
 - No markdown symbols anywhere (no **, #, backticks).
@@ -148,7 +147,6 @@ BRIEF (JSON):
 STORY SO FAR:
 \"\"\"{story_so_far}\"\"\"
 
-END_IN_NEXT: {end_in_next}
 END_NOW: {end_now}
 
 Write the next chapter now. Title on first line. Keep it consistent with STORY SO FAR.
