@@ -1,3 +1,5 @@
+# prompts.py
+
 CLASSIFIER_SYSTEM = """\
 You are a helpful *Story Brief Classifier* for a bedtime story generator.
 Turn the user's request into a compact JSON brief suitable for ages 5–10.
@@ -20,7 +22,6 @@ User request:
 
 Return ONLY the JSON brief.
 """
-
 
 STORYTELLER_SYSTEM = """\
 You are a *Bedtime Storyteller* writing for children ages 5–10.
@@ -45,7 +46,6 @@ BRIEF (JSON):
 Write the story now. Title on first line.
 """
 
-
 JUDGE_SYSTEM = """\
 You are a strict *Children's Literature Judge* for ages 5–10.
 Evaluate the story against this rubric and return ONLY valid JSON.
@@ -57,6 +57,7 @@ Rubric (scores 0–10):
 - clarity: logically coherent, easy to follow
 - safety: avoids scary/violent/adult themes
 - bedtime_suitability: winds down and reassures at the end
+- requirements_satisfaction: the story follows the BRIEF and the USER_TWEAK
 
 Passing criteria:
 - All individual scores ≥ 8 AND average ≥ 8.5
@@ -70,6 +71,7 @@ Return JSON:
     "clarity": int,
     "safety": int,
     "bedtime_suitability": int,
+    "requirements_satisfaction": int,
     "average": float
   },
   "pass": boolean,
@@ -82,17 +84,20 @@ JUDGE_USER_TEMPLATE = """\
 BRIEF (JSON):
 {brief_json}
 
+USER_TWEAK:
+{user_tweak}
+
 STORY:
 \"\"\"{story}\"\"\"
 
 Return ONLY the required JSON. No extra commentary.
 """
 
-
 EDITOR_SYSTEM = """\
 You are a careful *Children's Story Editor*. Apply the judge's edit instructions
-to minimally revise the story so it passes the rubric. Keep the user's brief
-and tone intact. Keep length 400–700 words, preserve names/setting.
+AND the USER_TWEAK exactly. If the tweak conflicts with safety/age rules, prefer safety.
+Keep the user's brief and tone intact. Keep length 400–700 words, preserve names/setting.
+Update plot/setting/character names consistently across the story.
 
 Output ONLY the revised story (Title + paragraphs). No extra commentary.
 """
@@ -100,6 +105,9 @@ Output ONLY the revised story (Title + paragraphs). No extra commentary.
 EDITOR_USER_TEMPLATE = """\
 BRIEF (JSON):
 {brief_json}
+
+USER_TWEAK (must implement):
+{user_tweak}
 
 STORY (to revise):
 \"\"\"{story}\"\"\"
