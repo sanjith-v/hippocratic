@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
-      .container { max-width: 820px; margin: 0 auto; }
+      .container { max-width: 980px; margin: 0 auto; }
       .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
       .title { font-size: 1.4rem; font-weight: 700; margin: 0 0 8px; }
       .btn { padding: 10px 16px; border-radius: 8px; border: 1px solid #1f2937; background: #111827; color: #fff; cursor: pointer; }
@@ -19,6 +19,7 @@
       .alert.info { background: #eef2ff; color: #1e3a8a; }
       .alert.warning { background: #fef3c7; color: #92400e; }
       .alert.danger { background: #fee2e2; color: #991b1b; }
+      .chapter { padding: 12px; border: 1px dashed #e5e7eb; border-radius: 8px; margin-bottom: 12px; background: #fafafa; }
 
       /* Loading overlay + spinner */
       .overlay {
@@ -45,7 +46,7 @@
 
     <div class="container">
       <h1 class="title">🌙 Bedtime Story Generator (Ages 5–10)</h1>
-      <p class="muted">Enter a simple idea, we’ll create a bedtime-safe story. Then tweak as much as you like.</p>
+      <p class="muted">Choose a short story or build a multi-chapter bedtime tale.</p>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -59,19 +60,25 @@
         <form id="generateForm" action="{{ url_for('generate') }}" method="post">
           <label for="prompt"><strong>Story idea</strong></label><br />
           <textarea id="prompt" name="prompt" rows="3" placeholder="e.g., An adventure about a cat and a water bottle, but calming at bedtime.">{{ state.prompt if state else "" }}</textarea>
+
+          <div class="row" style="margin-top: 10px;">
+            <label><input type="radio" name="mode" value="short" {{ 'checked' if not state or state.mode != 'arc' else '' }}> Short story</label>
+            <label><input type="radio" name="mode" value="arc" {{ 'checked' if state and state.mode == 'arc' else '' }}> Multi-arc (chapters)</label>
+          </div>
+
           <div class="row" style="margin-top: 12px;">
-            <button id="generateBtn" class="btn" type="submit">Generate Story</button>
+            <button id="generateBtn" class="btn" type="submit">Generate</button>
           </div>
         </form>
+
         {% if state %}
-          <!-- Reset form is OUTSIDE the generate form -->
           <form id="resetForm" action="{{ url_for('reset') }}" method="post" style="margin-top:10px;">
             <button class="btn secondary" type="submit">Reset</button>
           </form>
         {% endif %}
       </div>
 
-      {% if state %}
+      {% if state and state.mode == 'short' %}
         <div class="card">
           <div class="title">Your Story</div>
           <pre style="white-space: pre-wrap; font-family: inherit;">{{ state.story }}</pre>
@@ -83,7 +90,7 @@
             {% set v = r['verdict'] if r and 'verdict' in r else {} %}
             {% set scores = v['scores'] if v and 'scores' in v else {} %}
             <div class="muted">
-              Round {{ r['round'] }} — pass={{ v['pass'] if v and 'pass' in v else 'n/a' }} | avg={{ scores['average'] if scores and 'average' in scores else 'n/a' }}
+              Round {{ r['round'] }} — pass={{ v['pass'] if 'pass' in v else 'n/a' }} | avg={{ scores['average'] if 'average' in scores else 'n/a' }}
             </div>
           {% endfor %}
         </div>
@@ -99,10 +106,59 @@
           </form>
         </div>
       {% endif %}
+
+      {% if state and state.mode == 'arc' %}
+        <div class="card">
+          <div class="title">Chapters So Far</div>
+          {% for ch in state.chapters %}
+            <div class="chapter"><pre style="white-space: pre-wrap; font-family: inherit; margin:0;">{{ ch }}</pre></div>
+          {% endfor %}
+        </div>
+
+        <div class="card">
+          <div class="title">Chapter Controls</div>
+          <div class="row">
+            <form id="arcNextForm" action="{{ url_for('arc_next') }}" method="post">
+              <button id="arcNextBtn" class="btn" type="submit">Next Chapter</button>
+            </form>
+            <form id="arcEndNextForm" action="{{ url_for('arc_end_next') }}" method="post">
+              <button id="arcEndNextBtn" class="btn" type="submit">End Story in Next Chapter</button>
+            </form>
+            <form id="arcEndNowForm" action="{{ url_for('arc_end_now') }}" method="post">
+              <button id="arcEndNowBtn" class="btn" type="submit">End Now</button>
+            </form>
+          </div>
+          <p class="muted" style="margin-top:10px;">
+            “End Story in Next Chapter” creates a penultimate chapter that sets up a calm finale on the next click.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="title">Tweak Latest Chapter</div>
+          <form id="tweakForm" action="{{ url_for('tweak') }}" method="post">
+            <input type="text" id="tweakInput" name="tweak" placeholder="e.g., add more dialogue between the friends" />
+            <div class="muted" style="margin: 6px 0 12px;">
+              This tweak revises the most recent chapter only. Try: “shorter”, “calmer”, “more-dialogue”, “new-moral”, or any free text.
+            </div>
+            <button id="tweakBtn" class="btn" type="submit">Apply Tweak</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="title">Quality Check (Judge)</div>
+          {% for r in state.history %}
+            {% set v = r['verdict'] if r and 'verdict' in r else {} %}
+            {% set scores = v['scores'] if v and 'scores' in v else {} %}
+            <div class="muted">
+              {{ r['round'] }} — pass={{ v['pass'] if 'pass' in v else 'n/a' }} | avg={{ scores['average'] if 'average' in scores else 'n/a' }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
     </div>
 
     <script>
-      // Show overlay + disable the clicked button
+      // Overlay helpers
       function showLoading(msg, btn) {
         const overlay = document.getElementById('loadingOverlay');
         const text = overlay.querySelector('.loading-text');
@@ -114,49 +170,57 @@
           btn.disabled = true;
         }
       }
-    
-      // Submit helper that ensures a paint happens before navigation
       function safeSubmit(form, msg, btn) {
-        if (form.__submitting) return;        // guard against double submit
+        if (form.__submitting) return;
         form.__submitting = true;
-        // Prevent default navigation right away
-        // then allow a frame to render the overlay before we submit.
         showLoading(msg, btn);
-        requestAnimationFrame(() => {
-          // A tiny delay improves reliability on Safari/WebKit
-          setTimeout(() => form.submit(), 40);
-        });
+        requestAnimationFrame(() => setTimeout(() => form.submit(), 40));
       }
-    
-      // Hook up Generate
+
+      // Generate
       const genForm = document.getElementById('generateForm');
       const genBtn  = document.getElementById('generateBtn');
       if (genForm && genBtn) {
-        genForm.addEventListener('submit', function (e) {
+        genForm.addEventListener('submit', e => {
           e.preventDefault();
-          safeSubmit(genForm, 'Generating your story…', genBtn);
+          const modeChecked = document.querySelector('input[name="mode"]:checked');
+          const msg = (modeChecked && modeChecked.value === 'arc') ? 'Creating Chapter 1…' : 'Generating your story…';
+          safeSubmit(genForm, msg, genBtn);
         });
       }
-    
-      // Hook up Tweak
+
+      // Short-mode tweak or arc tweak (both use same id)
       const tweakForm = document.getElementById('tweakForm');
       const tweakBtn  = document.getElementById('tweakBtn');
       if (tweakForm && tweakBtn) {
-        tweakForm.addEventListener('submit', function (e) {
+        tweakForm.addEventListener('submit', e => {
           e.preventDefault();
           safeSubmit(tweakForm, 'Applying your tweak…', tweakBtn);
         });
       }
-    
-      // Hook up Reset (optional)
+
+      // Arc controls
+      const nextForm = document.getElementById('arcNextForm');
+      const nextBtn  = document.getElementById('arcNextBtn');
+      if (nextForm && nextBtn) {
+        nextForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(nextForm, 'Writing next chapter…', nextBtn); });
+      }
+      const endNextForm = document.getElementById('arcEndNextForm');
+      const endNextBtn  = document.getElementById('arcEndNextBtn');
+      if (endNextForm && endNextBtn) {
+        endNextForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(endNextForm, 'Setting up finale…', endNextBtn); });
+      }
+      const endNowForm = document.getElementById('arcEndNowForm');
+      const endNowBtn  = document.getElementById('arcEndNowBtn');
+      if (endNowForm && endNowBtn) {
+        endNowForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(endNowForm, 'Wrapping up story…', endNowBtn); });
+      }
+
+      // Reset
       const resetForm = document.getElementById('resetForm');
       if (resetForm) {
-        resetForm.addEventListener('submit', function (e) {
-          e.preventDefault();
-          safeSubmit(resetForm, 'Resetting…', null);
-        });
+        resetForm.addEventListener('submit', e => { e.preventDefault(); safeSubmit(resetForm, 'Resetting…', null); });
       }
     </script>
-    
   </body>
 </html>
